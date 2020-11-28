@@ -4,6 +4,7 @@ const { check, validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const router = Router();
+const config = require('config');
 
 //api/auth
 router.post(
@@ -14,17 +15,20 @@ router.post(
             .isLength({ min: 6 })
     ],
     async (req, res) => {
+        console.log('body', req.body)
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty) {
+
                 return res.status(400).json({
                     errors: errors.array(),
                     message: 'Wrong registation data'
                 })
             }
-            const { email, body } = req.body;
+            const { email, password } = req.body;
 
             const isUser = await User.findOne({ email });
+            console.log('isUser', isUser)
             //Check if user exist
             if (isUser) {
                 res.status(400).json({ messsage: 'User is alredy exist' })
@@ -32,18 +36,15 @@ router.post(
 
             //Register new user
             //Hasg passsword
-            const hashedPass = bcrypt.hash(password, 123);
+            const hashedPass = await bcrypt.hash(password, 12);
             const user = new User({ email, password: hashedPass });
 
             await user.save()
 
             res.status(201).json({ message: 'User was cteated' })
 
-
-
-
-
         } catch (e) {
+            console.log('e', e)
             res.status(500).json({ messsage: 'Something went wrong' })
         }
     })
@@ -58,6 +59,8 @@ router.post(
     ],
     async (req, res) => {
         try {
+            console.log('req', req)
+
             const errors = validationResult(req);
             if (!errors.isEmpty) {
                 return res.status(400).json({
@@ -66,7 +69,10 @@ router.post(
                 })
             }
             const { email, password } = req.body;
+            console.log('email, password ', email, password)
             const user = await User.findOne({ email });
+
+            console.log('user', user)
 
             if (!user) {
                 return res.status(400).json({ message: 'User not founde' });
@@ -74,16 +80,22 @@ router.post(
 
             const isMatch = await bcrypt.compare(password, user.password);
 
+            console.log('isMatch', isMatch)
+
             if (!isMatch) {
                 return res.status(400).json({ message: 'Wrong password' })
             }
 
+
+            console.log('userID', user.id)
             //Create token
             const token = jwt.sign(
-                { userId: user },
+                { userId: user.id },
                 config.get('jwtSecret'),
                 { expiresIn: '1h' }
             )
+
+
 
             res.json({ token, userId: user.id })
 
@@ -93,8 +105,5 @@ router.post(
         }
 
     })
-
-
-
 
 module.exports = router
